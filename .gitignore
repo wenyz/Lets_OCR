@@ -1,0 +1,12 @@
+# Intellij project files
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# personal app cache
+*.git
+__pycache__/
+
+
+detector/common/nms.c

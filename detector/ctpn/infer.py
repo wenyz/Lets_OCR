@@ -8,7 +8,7 @@ import torch
 import lib.draw_image
 import Net.net as Net
 import lib.utils
-import lib.nms
+#import lib.nms
 import math
 import random
 import shutil
@@ -22,7 +22,8 @@ THRESH_HOLD = 0.7
 NMS_THRESH = 0.3
 NEIGHBOURS_MIN_DIST = 50
 MIN_ANCHOR_BATCH = 2
-MODEL = './model/ctpn-msra_ali-9-end.model'
+#MODEL = './model/ctpn-msra_ali-9-end.model'
+MODEL = 'E:/ai/models/ctpn-msra_ali-9-end.model'
 
 
 def threshold(coords, min_, max_):
@@ -218,6 +219,43 @@ def get_successions(v, anchors=[]):
     return result
 
 
+def py_cpu_nms(dets, thresh):
+    """Pure Python NMS baseline."""
+    x1 = dets[:, 0]
+    y1 = dets[:, 1]
+    x2 = dets[:, 2]
+    y2 = dets[:, 3]
+    scores = dets[:, 4]
+
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+    #按照从小到大排序后返回下标，然后顺序取反，即从大到小对应的下标
+    order = scores.argsort()[::-1]
+
+    keep = []
+    while order.size > 0:
+        i = order[0]
+        keep.append(i)
+        #求交叉面积intersection采用了这个非常巧妙的方法，自己画一下思考一下
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+
+        w = np.maximum(0.0, xx2 - xx1 + 1) #计算w
+        h = np.maximum(0.0, yy2 - yy1 + 1) #计算h
+        inter = w * h       #交叉面积
+        #A交B/A并B
+        ovr = inter / (areas[i] + areas[order[1:]] - inter)
+        """
+        保留重叠面积小于threshold的
+        np.where的返回值是tuple
+        第一个维度是x的list，第二个维度是y的list
+        这里因为输入是1维，因此就取0就好
+        """
+        inds = np.where(ovr <= thresh)[0]
+        order = order[inds + 1]
+    return keep
+
 def infer_one(im_name, net):
     im = cv2.imread(im_name)
     im = lib.dataset_handler.scale_img_only(im)
@@ -238,7 +276,8 @@ def infer_one(im_name, net):
         pt = lib.utils.trans_to_2pt(box[1], box[0] * 16 + 7.5, anchor_height[box[2]])
         for_nms.append([pt[0], pt[1], pt[2], pt[3], box[3], box[0], box[1], box[2]])
     for_nms = np.array(for_nms, dtype=np.float32)
-    nms_result = lib.nms.cpu_nms(for_nms, NMS_THRESH)
+    #nms_result = lib.nms.cpu_nms(for_nms, NMS_THRESH)
+    nms_result = py_cpu_nms(for_nms, NMS_THRESH)
 
     out_nms = []
     for i in nms_result:
@@ -295,7 +334,8 @@ def random_test(net):
             pt = lib.utils.trans_to_2pt(box[1], box[0] * 16 + 7.5, anchor_height[box[2]])
             for_nms.append([pt[0], pt[1], pt[2], pt[3], box[3], box[0], box[1], box[2]])
         for_nms = np.array(for_nms, dtype=np.float32)
-        nms_result = lib.nms.cpu_nms(for_nms, NMS_THRESH)
+        #nms_result = lib.nms.cpu_nms(for_nms, NMS_THRESH)
+        nms_result = py_cpu_nms(for_nms, NMS_THRESH)
 
         out_nms = []
         for i in nms_result:
